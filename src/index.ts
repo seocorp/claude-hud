@@ -10,6 +10,7 @@ import { getMemoryUsage } from "./memory.js";
 import { resolveEffortLevel } from "./effort.js";
 import { applyContextWindowFallback } from "./context-cache.js";
 import { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from "./external-usage.js";
+import { getModelScopedUsage } from "./scoped-usage.js";
 import { setLanguage, t } from "./i18n/index.js";
 import type { RenderContext } from "./types.js";
 
@@ -22,6 +23,7 @@ export type MainDeps = {
   getUsageFromStdin: typeof getUsageFromStdin;
   getUsageFromExternalSnapshot: typeof getUsageFromExternalSnapshot;
   writeExternalUsageSnapshot: typeof writeExternalUsageSnapshot;
+  getModelScopedUsage: typeof getModelScopedUsage;
   parseTranscript: typeof parseTranscript;
   countConfigs: typeof countConfigs;
   getGitStatus: typeof getGitStatus;
@@ -63,6 +65,7 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
     getUsageFromStdin,
     getUsageFromExternalSnapshot,
     writeExternalUsageSnapshot,
+    getModelScopedUsage,
     parseTranscript,
     countConfigs,
     getGitStatus,
@@ -139,6 +142,17 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
               sevenDayResetAt: ext.sevenDayResetAt ?? null,
             }),
           };
+        }
+      }
+
+      // Claude Code shows per-model weekly windows in /usage (e.g. "Current
+      // week (Fable)") but does not forward them in the statusline payload
+      // yet. When stdin lacks them, pull the same server data via the
+      // TTL-cached OAuth usage fallback.
+      if (usageData && (usageData.modelScoped?.length ?? 0) === 0) {
+        const scoped = await deps.getModelScopedUsage();
+        if (scoped && scoped.length > 0) {
+          usageData = { ...usageData, modelScoped: scoped };
         }
       }
     }
