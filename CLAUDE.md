@@ -56,6 +56,7 @@ Claude Code → stdin JSON → parse → render lines → stdout → Claude Code
 - `rate_limits.five_hour.resets_at` - 5-hour reset timestamp
 - `rate_limits.seven_day.used_percentage` - 7-day subscriber usage percentage
 - `rate_limits.seven_day.resets_at` - 7-day reset timestamp
+- `rate_limits.model_scoped[]` - per-model weekly windows (`display_name`, `utilization`, ISO `resets_at`), Claude Code 2.1.201+
 
 ### File Structure
 

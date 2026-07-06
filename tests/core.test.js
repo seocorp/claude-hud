@@ -309,6 +309,69 @@ test('getUsageFromStdin rejects invalid fields and keeps only official usage dat
   });
 });
 
+test('getUsageFromStdin parses model_scoped weekly windows', () => {
+  const usage = getUsageFromStdin({
+    rate_limits: {
+      five_hour: {
+        used_percentage: 96,
+        resets_at: 1710000000,
+      },
+      seven_day: {
+        used_percentage: 20.4,
+        resets_at: 1710600000,
+      },
+      model_scoped: [
+        { display_name: 'Fable', utilization: 36.4, resets_at: '2026-07-11T04:59:59+00:00' },
+      ],
+    },
+  });
+
+  assert.deepEqual(usage, {
+    fiveHour: 96,
+    sevenDay: 20,
+    fiveHourResetAt: new Date(1710000000 * 1000),
+    sevenDayResetAt: new Date(1710600000 * 1000),
+    modelScoped: [
+      { label: 'Fable', percent: 36, resetAt: new Date('2026-07-11T04:59:59+00:00') },
+    ],
+  });
+});
+
+test('getUsageFromStdin returns scoped-only usage when shared windows are missing', () => {
+  const usage = getUsageFromStdin({
+    rate_limits: {
+      model_scoped: [
+        { display_name: 'Fable', utilization: 36, resets_at: '2026-07-11T04:59:59+00:00' },
+      ],
+    },
+  });
+
+  assert.equal(usage?.fiveHour, null);
+  assert.equal(usage?.sevenDay, null);
+  assert.equal(usage?.modelScoped?.length, 1);
+});
+
+test('getUsageFromStdin drops malformed model_scoped entries', () => {
+  const usage = getUsageFromStdin({
+    rate_limits: {
+      five_hour: {
+        used_percentage: 10,
+        resets_at: 1710000000,
+      },
+      model_scoped: [
+        null,
+        { utilization: 50 },
+        { display_name: '   ' },
+        { display_name: '\x1B[31mFable\x1B[0m', utilization: 120.7, resets_at: 'not-a-date' },
+      ],
+    },
+  });
+
+  assert.deepEqual(usage?.modelScoped, [
+    { label: 'Fable', percent: 100, resetAt: null },
+  ]);
+});
+
 test('getModelName precedence: trimmed display name, then normalized bedrock label, then raw id, then fallback', () => {
   assert.equal(getModelName({ model: { display_name: '  Opus  ', id: 'anthropic.claude-3-5-sonnet-20240620-v1:0' } }), 'Opus');
   assert.equal(getModelName({ model: { id: 'anthropic.claude-3-5-sonnet-20240620-v1:0' } }), 'Claude Sonnet 3.5');

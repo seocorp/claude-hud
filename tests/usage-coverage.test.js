@@ -289,3 +289,60 @@ test('renderUsageLine elapsedAndAbsolute format for limit uses absolute', () => 
   assert.ok(line.includes('Limit reached'));
   assert.ok(line.includes('resets at'));
 });
+
+test('renderUsageLine appends model-scoped windows after the five-hour window', () => {
+  const ctx = baseContext();
+  ctx.usageData.fiveHour = 96;
+  ctx.usageData.sevenDay = 20;
+  ctx.usageData.fiveHourResetAt = new Date(Date.now() + 30 * 60 * 1000);
+  ctx.usageData.sevenDayResetAt = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
+  ctx.usageData.modelScoped = [
+    { label: 'Fable', percent: 36, resetAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000) },
+  ];
+  const line = stripAnsi(renderUsageLine(ctx) ?? '');
+  assert.ok(line.includes('Fable'));
+  assert.ok(line.includes('36%'));
+  // sevenDay stays below sevenDayThreshold, so the shared weekly window stays hidden
+  assert.ok(!line.includes('Weekly'));
+});
+
+test('renderUsageLine shows model-scoped windows when both shared windows are null', () => {
+  const ctx = baseContext();
+  ctx.usageData.fiveHour = null;
+  ctx.usageData.sevenDay = null;
+  ctx.usageData.fiveHourResetAt = null;
+  ctx.usageData.sevenDayResetAt = null;
+  ctx.usageData.modelScoped = [
+    { label: 'Fable', percent: 36, resetAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000) },
+  ];
+  const line = stripAnsi(renderUsageLine(ctx) ?? '');
+  assert.ok(line.includes('Usage'));
+  assert.ok(line.includes('Fable'));
+  assert.ok(line.includes('36%'));
+});
+
+test('renderUsageLine compact mode appends model-scoped windows', () => {
+  const ctx = baseContext();
+  ctx.config.display.usageCompact = true;
+  ctx.usageData.fiveHour = 60;
+  ctx.usageData.fiveHourResetAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+  ctx.usageData.modelScoped = [
+    { label: 'Fable', percent: 36, resetAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000) },
+  ];
+  const line = stripAnsi(renderUsageLine(ctx) ?? '');
+  assert.ok(line.includes('5h:'));
+  assert.ok(line.includes('Fable:'));
+  assert.ok(line.includes('36%'));
+});
+
+test('renderUsageLine counts model-scoped usage toward the display threshold', () => {
+  const ctx = baseContext();
+  ctx.config.display.usageThreshold = 30;
+  ctx.usageData.fiveHour = 5;
+  ctx.usageData.modelScoped = [
+    { label: 'Fable', percent: 36, resetAt: null },
+  ];
+  const line = stripAnsi(renderUsageLine(ctx) ?? '');
+  assert.ok(line.includes('Fable'));
+  assert.ok(line.includes('36%'));
+});

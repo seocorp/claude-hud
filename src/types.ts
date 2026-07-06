@@ -44,6 +44,14 @@ export interface StdinData {
       used_percentage?: number | null;
       resets_at?: number | null;
     } | null;
+    // Claude Code 2.1.201+ adds per-model weekly windows (e.g. "Fable") when
+    // the server reports them. Unlike five_hour/seven_day, resets_at is an
+    // ISO 8601 string here.
+    model_scoped?: Array<{
+      display_name?: string | null;
+      utilization?: number | null;
+      resets_at?: string | number | null;
+    } | null> | null;
   } | null;
   // Claude Code 2.1.115+ exposes effort as an object: { level: "max" }.
   // Earlier versions (≤2.1.114) did not send this field at all. The bare-string
@@ -77,12 +85,19 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
+export interface ModelScopedUsage {
+  label: string;  // server-supplied model bucket name (e.g. "Fable")
+  percent: number | null;  // 0-100 percentage, null if unavailable
+  resetAt: Date | null;
+}
+
 export interface UsageData {
   fiveHour: number | null;  // 0-100 percentage, null if unavailable
   sevenDay: number | null;  // 0-100 percentage, null if unavailable
   fiveHourResetAt: Date | null;
   sevenDayResetAt: Date | null;
   balanceLabel?: string | null;  // optional raw balance text (e.g. "¥6.35")
+  modelScoped?: ModelScopedUsage[];  // per-model weekly windows, if any
 }
 
 export interface ExternalUsageSnapshot {
