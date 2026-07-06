@@ -108,6 +108,9 @@ export interface MemoryInfo {
 }
 /** Check if usage limit is reached (either window at 100%) */
 export declare function isLimitReached(data: UsageData): boolean;
+export declare const FABLE_LABEL = "Fable";
+export declare const FABLE_WEEKLY_SHARE = 0.5;
+export declare function deriveFableUsage(data: UsageData): ModelScopedUsage | null;
 export interface SessionTokenUsage {
     inputTokens: number;
     outputTokens: number;

@@ -10,8 +10,8 @@ import { getMemoryUsage } from "./memory.js";
 import { resolveEffortLevel } from "./effort.js";
 import { applyContextWindowFallback } from "./context-cache.js";
 import { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from "./external-usage.js";
-import { getModelScopedUsage } from "./scoped-usage.js";
 import { setLanguage, t } from "./i18n/index.js";
+import { deriveFableUsage } from "./types.js";
 export { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from "./external-usage.js";
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
@@ -40,7 +40,6 @@ export async function main(overrides = {}) {
         getUsageFromStdin,
         getUsageFromExternalSnapshot,
         writeExternalUsageSnapshot,
-        getModelScopedUsage,
         parseTranscript,
         countConfigs,
         getGitStatus,
@@ -110,14 +109,14 @@ export async function main(overrides = {}) {
                     };
                 }
             }
-            // Claude Code shows per-model weekly windows in /usage (e.g. "Current
-            // week (Fable)") but does not forward them in the statusline payload
-            // yet. When stdin lacks them, pull the same server data via the
-            // TTL-cached OAuth usage fallback.
+            // Claude Code doesn't forward a Fable-scoped weekly window in the
+            // statusline payload, so derive it from the live weekly value
+            // (100% of the Fable allowance == 50% of the weekly limit). Real
+            // stdin model_scoped data, once Claude Code sends it, wins.
             if (usageData && (usageData.modelScoped?.length ?? 0) === 0) {
-                const scoped = await deps.getModelScopedUsage();
-                if (scoped && scoped.length > 0) {
-                    usageData = { ...usageData, modelScoped: scoped };
+                const fable = deriveFableUsage(usageData);
+                if (fable) {
+                    usageData = { ...usageData, modelScoped: [fable] };
                 }
             }
         }
