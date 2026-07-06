@@ -18,7 +18,7 @@ const debug = createDebug('scoped-usage');
 const USAGE_ENDPOINT = 'https://api.anthropic.com/api/oauth/usage';
 const OAUTH_BETA_HEADER = 'oauth-2025-04-20';
 export const SCOPED_USAGE_TTL_MS = 60_000;
-const FETCH_TIMEOUT_MS = 1_500;
+const FETCH_TIMEOUT_MS = 3_000;
 const MAX_LABEL_LENGTH = 30;
 const CACHE_FILE_NAME = 'scoped-usage-cache.json';
 
@@ -175,6 +175,13 @@ export async function getModelScopedUsage(
     return cached ? reviveScoped(cached.scoped) : null;
   }
 
+  // Claim the refresh slot before fetching. The usage endpoint rate-limits
+  // aggressively (back-to-back requests get 429), and the statusline runs as
+  // many concurrent short-lived processes, so without a claim a cold cache
+  // triggers a stampede. The claim keeps the last known data and throttles
+  // every outcome — success or failure — to one attempt per TTL.
+  writeCache(cachePath, { checked_at: now, scoped: cached?.scoped ?? [] });
+
   try {
     const response = await deps.fetchImpl(USAGE_ENDPOINT, {
       headers: {
@@ -192,9 +199,8 @@ export async function getModelScopedUsage(
     return reviveScoped(scoped);
   } catch (err) {
     debug('Usage fetch failed:', err instanceof Error ? err.message : err);
-    // Record the attempt so failures are also throttled to one per TTL,
-    // and keep serving the last known data if we had any.
-    writeCache(cachePath, { checked_at: now, scoped: cached?.scoped ?? [] });
+    // Leave the claim as-is: never overwrite data a concurrent successful
+    // refresh may have just written, and keep serving what we knew.
     return cached ? reviveScoped(cached.scoped) : null;
   }
 }

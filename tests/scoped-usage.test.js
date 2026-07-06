@@ -134,6 +134,45 @@ test('getModelScopedUsage returns null without credentials and never fetches', a
   });
 });
 
+test('getModelScopedUsage keeps the last known windows when a refresh attempt fails', async () => {
+  await withCleanConfigDirEnv(async () => {
+    const home = await makeHome();
+    try {
+      const okFetch = async () => ({ ok: true, json: async () => USAGE_BODY });
+      await getModelScopedUsage({ homeDir: home, fetchImpl: okFetch, now: () => 1_000_000 });
+
+      const failed = await getModelScopedUsage({
+        homeDir: home,
+        fetchImpl: async () => {
+          throw new Error('HTTP 429');
+        },
+        now: () => 1_000_000 + SCOPED_USAGE_TTL_MS + 1,
+      });
+      assert.deepEqual(failed, [
+        { label: 'Fable', percent: 15, resetAt: new Date('2026-07-07T09:00:00+00:00') },
+      ]);
+
+      // The failed attempt claimed the slot, so the next call inside the TTL
+      // serves the preserved data without fetching again.
+      let calls = 0;
+      const third = await getModelScopedUsage({
+        homeDir: home,
+        fetchImpl: async () => {
+          calls += 1;
+          return { ok: true, json: async () => USAGE_BODY };
+        },
+        now: () => 1_000_000 + SCOPED_USAGE_TTL_MS + 2,
+      });
+      assert.equal(calls, 0);
+      assert.deepEqual(third, [
+        { label: 'Fable', percent: 15, resetAt: new Date('2026-07-07T09:00:00+00:00') },
+      ]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
 test('getModelScopedUsage throttles failed fetches through the cache', async () => {
   await withCleanConfigDirEnv(async () => {
     const home = await makeHome();
