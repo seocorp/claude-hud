@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { _setCreateReadStreamForTests, parseTranscript } from '../dist/transcript.js';
 import { countConfigs } from '../dist/config-reader.js';
 import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, getUsageFromStdin, isBedrockModelId, stripContextSuffix, formatModelName } from '../dist/stdin.js';
+import { deriveFableUsage } from '../dist/types.js';
 import { estimateSessionCost, resolveSessionCost, formatUsd } from '../dist/cost.js';
 import * as fs from 'node:fs';
 
@@ -370,6 +371,32 @@ test('getUsageFromStdin drops malformed model_scoped entries', () => {
   assert.deepEqual(usage?.modelScoped, [
     { label: 'Fable', percent: 100, resetAt: null },
   ]);
+});
+
+test('deriveFableUsage doubles the weekly percentage against the 50% Fable allowance', () => {
+  const derived = deriveFableUsage({
+    fiveHour: 18,
+    sevenDay: 23,
+    fiveHourResetAt: null,
+    sevenDayResetAt: new Date('2026-07-11T04:59:59+00:00'),
+  });
+
+  assert.deepEqual(derived, {
+    label: 'Fable',
+    percent: 46,
+    resetAt: new Date('2026-07-11T04:59:59+00:00'),
+  });
+});
+
+test('deriveFableUsage caps at 100 and requires a weekly value', () => {
+  assert.equal(
+    deriveFableUsage({ fiveHour: 10, sevenDay: null, fiveHourResetAt: null, sevenDayResetAt: null }),
+    null,
+  );
+  assert.equal(
+    deriveFableUsage({ fiveHour: 10, sevenDay: 62, fiveHourResetAt: null, sevenDayResetAt: null })?.percent,
+    100,
+  );
 });
 
 test('getModelName precedence: trimmed display name, then normalized bedrock label, then raw id, then fallback', () => {

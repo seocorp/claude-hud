@@ -278,7 +278,6 @@ test("main includes usageData from stdin when available", async () => {
     countConfigs: async () => makeCounts(),
     loadConfig: async () => makeConfig(),
     getGitStatus: async () => null,
-    getModelScopedUsage: async () => null,
     getUsageFromExternalSnapshot: () => {
       externalCalls += 1;
       return null;
@@ -294,6 +293,9 @@ test("main includes usageData from stdin when available", async () => {
     sevenDay: 25,
     fiveHourResetAt: new Date(1710000000 * 1000),
     sevenDayResetAt: new Date(1710600000 * 1000),
+    modelScoped: [
+      { label: "Fable", percent: 50, resetAt: new Date(1710600000 * 1000) },
+    ],
   });
 });
 
@@ -336,7 +338,6 @@ test("main uses external usage fallback when stdin rate limits are absent", asyn
     countConfigs: async () => makeCounts(),
     loadConfig: async () => makeConfig(),
     getGitStatus: async () => null,
-    getModelScopedUsage: async () => null,
     now: () => Date.UTC(2026, 3, 20, 12, 1, 0),
     getUsageFromExternalSnapshot: (config, now) => {
       externalCalls += 1;
@@ -350,7 +351,12 @@ test("main uses external usage fallback when stdin rate limits are absent", asyn
   });
 
   assert.equal(externalCalls, 1);
-  assert.deepEqual(renderedContext?.usageData, externalUsage);
+  assert.deepEqual(renderedContext?.usageData, {
+    ...externalUsage,
+    modelScoped: [
+      { label: "Fable", percent: 100, resetAt: externalUsage.sevenDayResetAt },
+    ],
+  });
 });
 
 test("main prefers stdin usage over external usage fallback", async () => {
@@ -368,7 +374,6 @@ test("main prefers stdin usage over external usage fallback", async () => {
     countConfigs: async () => makeCounts(),
     loadConfig: async () => makeConfig(),
     getGitStatus: async () => null,
-    getModelScopedUsage: async () => null,
     getUsageFromExternalSnapshot: () => {
       externalCalls += 1;
       return {
@@ -389,6 +394,9 @@ test("main prefers stdin usage over external usage fallback", async () => {
     sevenDay: 55,
     fiveHourResetAt: new Date(1710000000 * 1000),
     sevenDayResetAt: new Date(1710600000 * 1000),
+    modelScoped: [
+      { label: "Fable", percent: 100, resetAt: new Date(1710600000 * 1000) },
+    ],
   });
 });
 
@@ -409,7 +417,6 @@ test("main appends external balance label to stdin usage when snapshot path is c
       display: { externalUsagePath: "/tmp/usage.json" },
     }),
     getGitStatus: async () => null,
-    getModelScopedUsage: async () => null,
     getUsageFromExternalSnapshot: () => {
       externalCalls += 1;
       return {
@@ -432,6 +439,9 @@ test("main appends external balance label to stdin usage when snapshot path is c
     fiveHourResetAt: new Date(1710000000 * 1000),
     sevenDayResetAt: new Date(1710600000 * 1000),
     balanceLabel: "$12.34 / $20.00",
+    modelScoped: [
+      { label: "Fable", percent: 100, resetAt: new Date(1710600000 * 1000) },
+    ],
   });
 });
 
@@ -451,7 +461,6 @@ test("main fills missing seven-day usage from external snapshot", async () => {
       display: { externalUsagePath: "/tmp/usage.json" },
     }),
     getGitStatus: async () => null,
-    getModelScopedUsage: async () => null,
     getUsageFromExternalSnapshot: () => {
       externalCalls += 1;
       return {
@@ -474,6 +483,9 @@ test("main fills missing seven-day usage from external snapshot", async () => {
     fiveHourResetAt: new Date(1710000000 * 1000),
     sevenDayResetAt: new Date("2026-04-27T12:00:00.000Z"),
     balanceLabel: "$12.34 / $20.00",
+    modelScoped: [
+      { label: "Fable", percent: 100, resetAt: new Date("2026-04-27T12:00:00.000Z") },
+    ],
   });
 });
 

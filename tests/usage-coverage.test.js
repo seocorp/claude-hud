@@ -290,7 +290,7 @@ test('renderUsageLine elapsedAndAbsolute format for limit uses absolute', () => 
   assert.ok(line.includes('resets at'));
 });
 
-test('renderUsageLine appends model-scoped windows after the five-hour window', () => {
+test('renderUsageLine renders model-scoped windows on their own line', () => {
   const ctx = baseContext();
   ctx.usageData.fiveHour = 96;
   ctx.usageData.sevenDay = 20;
@@ -300,8 +300,11 @@ test('renderUsageLine appends model-scoped windows after the five-hour window', 
     { label: 'Fable', percent: 36, resetAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000) },
   ];
   const line = stripAnsi(renderUsageLine(ctx) ?? '');
-  assert.ok(line.includes('Fable'));
-  assert.ok(line.includes('36%'));
+  const [usageLine, scopedLine] = line.split('\n');
+  assert.ok(usageLine.includes('Usage'));
+  assert.ok(!usageLine.includes('Fable'));
+  assert.ok(scopedLine.includes('Fable'));
+  assert.ok(scopedLine.includes('36%'));
   // sevenDay stays below sevenDayThreshold, so the shared weekly window stays hidden
   assert.ok(!line.includes('Weekly'));
 });

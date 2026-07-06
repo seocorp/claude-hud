@@ -56,7 +56,7 @@ Claude Code → stdin JSON → parse → render lines → stdout → Claude Code
 - `rate_limits.five_hour.resets_at` - 5-hour reset timestamp
 - `rate_limits.seven_day.used_percentage` - 7-day subscriber usage percentage
 - `rate_limits.seven_day.resets_at` - 7-day reset timestamp
-- `rate_limits.model_scoped[]` - per-model weekly windows (`display_name`, `utilization`, ISO `resets_at`); schema exists in Claude Code 2.1.201+ but is not emitted yet, so `src/scoped-usage.ts` fetches the same windows from the OAuth usage API (`/api/oauth/usage` `limits[]`) with a 60s on-disk cache when stdin lacks them
+- `rate_limits.model_scoped[]` - per-model weekly windows (`display_name`, `utilization`, ISO `resets_at`); schema exists in Claude Code 2.1.201+ but is not emitted yet, so the Fable window is derived from `seven_day` in real time (100% of the Fable allowance == 50% of the weekly limit, see `deriveFableUsage` in `src/types.ts`)
 
 ### File Structure
 

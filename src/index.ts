@@ -10,8 +10,8 @@ import { getMemoryUsage } from "./memory.js";
 import { resolveEffortLevel } from "./effort.js";
 import { applyContextWindowFallback } from "./context-cache.js";
 import { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from "./external-usage.js";
-import { getModelScopedUsage } from "./scoped-usage.js";
 import { setLanguage, t } from "./i18n/index.js";
+import { deriveFableUsage } from "./types.js";
 import type { RenderContext } from "./types.js";
 
 export { getUsageFromExternalSnapshot, writeExternalUsageSnapshot } from "./external-usage.js";
@@ -23,7 +23,6 @@ export type MainDeps = {
   getUsageFromStdin: typeof getUsageFromStdin;
   getUsageFromExternalSnapshot: typeof getUsageFromExternalSnapshot;
   writeExternalUsageSnapshot: typeof writeExternalUsageSnapshot;
-  getModelScopedUsage: typeof getModelScopedUsage;
   parseTranscript: typeof parseTranscript;
   countConfigs: typeof countConfigs;
   getGitStatus: typeof getGitStatus;
@@ -65,7 +64,6 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
     getUsageFromStdin,
     getUsageFromExternalSnapshot,
     writeExternalUsageSnapshot,
-    getModelScopedUsage,
     parseTranscript,
     countConfigs,
     getGitStatus,
@@ -145,14 +143,14 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
         }
       }
 
-      // Claude Code shows per-model weekly windows in /usage (e.g. "Current
-      // week (Fable)") but does not forward them in the statusline payload
-      // yet. When stdin lacks them, pull the same server data via the
-      // TTL-cached OAuth usage fallback.
+      // Claude Code doesn't forward a Fable-scoped weekly window in the
+      // statusline payload, so derive it from the live weekly value
+      // (100% of the Fable allowance == 50% of the weekly limit). Real
+      // stdin model_scoped data, once Claude Code sends it, wins.
       if (usageData && (usageData.modelScoped?.length ?? 0) === 0) {
-        const scoped = await deps.getModelScopedUsage();
-        if (scoped && scoped.length > 0) {
-          usageData = { ...usageData, modelScoped: scoped };
+        const fable = deriveFableUsage(usageData);
+        if (fable) {
+          usageData = { ...usageData, modelScoped: [fable] };
         }
       }
     }

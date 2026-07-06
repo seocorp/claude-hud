@@ -114,7 +114,10 @@ export function renderUsageLine(
       forceLabel: true,
       usageValueMode,
     }));
-  const scopedSuffix = scopedParts.length > 0 ? ` | ${scopedParts.join(" | ")}` : "";
+  // Scoped windows get their own physical line below the usage line: with
+  // three windows the combined line exceeds common terminal widths and the
+  // renderer would wrap it at an arbitrary separator anyway.
+  const scopedSuffix = scopedParts.length > 0 ? `\n${scopedParts.join(" | ")}` : "";
 
   if (fiveHour === null && sevenDay !== null) {
     const weeklyOnlyPart = formatUsageWindowPart({
@@ -132,7 +135,7 @@ export function renderUsageLine(
       alignLabels,
       usageValueMode,
     });
-    return appendBalance(`${usageLabel} ${weeklyOnlyPart}${scopedSuffix}`, balanceLabel);
+    return appendBalance(`${usageLabel} ${weeklyOnlyPart}`, balanceLabel) + scopedSuffix;
   }
 
   if (fiveHour === null && scopedParts.length > 0) {
@@ -168,10 +171,10 @@ export function renderUsageLine(
       alignLabels,
       usageValueMode,
     });
-    return appendBalance(`${usageLabel} ${fiveHourPart} | ${sevenDayPart}${scopedSuffix}`, balanceLabel);
+    return appendBalance(`${usageLabel} ${fiveHourPart} | ${sevenDayPart}`, balanceLabel) + scopedSuffix;
   }
 
-  return appendBalance(`${usageLabel} ${fiveHourPart}${scopedSuffix}`, balanceLabel);
+  return appendBalance(`${usageLabel} ${fiveHourPart}`, balanceLabel) + scopedSuffix;
 }
 
 function appendBalance(line: string, balanceLabel: string | null): string {
