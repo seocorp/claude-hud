@@ -1,5 +1,6 @@
 import { AUTOCOMPACT_BUFFER_PERCENT } from './constants.js';
 import { createDebug } from './debug.js';
+import { sanitizeDisplayText } from './utils/sanitize.js';
 const debug = createDebug('stdin');
 const DEFAULT_FIRST_BYTE_TIMEOUT_MS = 250;
 const DEFAULT_IDLE_TIMEOUT_MS = 30;
@@ -242,6 +243,42 @@ function parseRateLimitResetAt(value) {
     }
     return new Date(value * 1000);
 }
+const MAX_MODEL_SCOPED_LABEL_LENGTH = 30;
+// model_scoped resets_at is an ISO 8601 string (unlike the epoch-seconds
+// five_hour/seven_day fields), but tolerate numbers in case the schema shifts.
+function parseModelScopedResetAt(value) {
+    if (typeof value === 'number') {
+        return parseRateLimitResetAt(value);
+    }
+    if (typeof value === 'string' && value.trim()) {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+    return null;
+}
+function parseModelScopedLimits(entries) {
+    if (!Array.isArray(entries)) {
+        return [];
+    }
+    const scoped = [];
+    for (const entry of entries) {
+        if (!entry || typeof entry.display_name !== 'string') {
+            continue;
+        }
+        const label = sanitizeDisplayText(entry.display_name)
+            .trim()
+            .slice(0, MAX_MODEL_SCOPED_LABEL_LENGTH);
+        if (!label) {
+            continue;
+        }
+        scoped.push({
+            label,
+            percent: parseRateLimitPercent(entry.utilization),
+            resetAt: parseModelScopedResetAt(entry.resets_at),
+        });
+    }
+    return scoped;
+}
 export function getUsageFromStdin(stdin) {
     const rateLimits = stdin.rate_limits;
     if (!rateLimits) {
@@ -249,7 +286,8 @@ export function getUsageFromStdin(stdin) {
     }
     const fiveHour = parseRateLimitPercent(rateLimits.five_hour?.used_percentage);
     const sevenDay = parseRateLimitPercent(rateLimits.seven_day?.used_percentage);
-    if (fiveHour === null && sevenDay === null) {
+    const modelScoped = parseModelScopedLimits(rateLimits.model_scoped);
+    if (fiveHour === null && sevenDay === null && modelScoped.length === 0) {
         return null;
     }
     return {
@@ -257,6 +295,7 @@ export function getUsageFromStdin(stdin) {
         sevenDay,
         fiveHourResetAt: parseRateLimitResetAt(rateLimits.five_hour?.resets_at),
         sevenDayResetAt: parseRateLimitResetAt(rateLimits.seven_day?.resets_at),
+        ...(modelScoped.length > 0 && { modelScoped }),
     };
 }
 /**

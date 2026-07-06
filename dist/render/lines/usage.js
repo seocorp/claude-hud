@@ -21,7 +21,10 @@ export function renderUsageLine(ctx, alignLabels = false) {
     }
     const usageLabel = progressLabel("label.usage", colors, alignLabels);
     const balanceLabel = ctx.usageData.balanceLabel ?? null;
-    const hasWindowData = ctx.usageData.fiveHour !== null || ctx.usageData.sevenDay !== null;
+    const modelScoped = ctx.usageData.modelScoped ?? [];
+    const hasWindowData = ctx.usageData.fiveHour !== null
+        || ctx.usageData.sevenDay !== null
+        || modelScoped.length > 0;
     if (balanceLabel && !hasWindowData) {
         return `${usageLabel} ${balanceLabel}`;
     }
@@ -48,7 +51,7 @@ export function renderUsageLine(ctx, alignLabels = false) {
     const threshold = display?.usageThreshold ?? 0;
     const fiveHour = ctx.usageData.fiveHour;
     const sevenDay = ctx.usageData.sevenDay;
-    const effectiveUsage = Math.max(fiveHour ?? 0, sevenDay ?? 0);
+    const effectiveUsage = Math.max(fiveHour ?? 0, sevenDay ?? 0, ...modelScoped.map((scoped) => scoped.percent ?? 0));
     if (effectiveUsage < threshold) {
         return balanceLabel ? `${usageLabel} ${balanceLabel}` : null;
     }
@@ -60,14 +63,27 @@ export function renderUsageLine(ctx, alignLabels = false) {
         const sevenDayPart = (sevenDay !== null && (fiveHour === null || sevenDay >= sevenDayThreshold))
             ? formatCompactWindowPart("7d", sevenDay, ctx.usageData.sevenDayResetAt, SEVEN_DAY_WINDOW_MS, timeFormat, colors, usageValueMode)
             : null;
-        if (fiveHourPart && sevenDayPart) {
-            return appendBalance(`${fiveHourPart} | ${sevenDayPart}`, balanceLabel);
-        }
-        const compactLine = fiveHourPart ?? sevenDayPart;
-        return compactLine ? appendBalance(compactLine, balanceLabel) : null;
+        const scopedCompactParts = modelScoped.map((scoped) => formatCompactWindowPart(scoped.label, scoped.percent, scoped.resetAt, SEVEN_DAY_WINDOW_MS, timeFormat, colors, usageValueMode));
+        const compactParts = [fiveHourPart, sevenDayPart, ...scopedCompactParts]
+            .filter((part) => part !== null);
+        return compactParts.length > 0 ? appendBalance(compactParts.join(" | "), balanceLabel) : null;
     }
     const usageBarEnabled = display?.usageBarEnabled ?? true;
     const barWidth = getAdaptiveBarWidth();
+    const scopedParts = modelScoped.map((scoped) => formatUsageWindowPart({
+        label: scoped.label,
+        percent: scoped.percent,
+        resetAt: scoped.resetAt,
+        windowMs: SEVEN_DAY_WINDOW_MS,
+        colors,
+        usageBarEnabled,
+        barWidth,
+        timeFormat,
+        showResetLabel,
+        forceLabel: true,
+        usageValueMode,
+    }));
+    const scopedSuffix = scopedParts.length > 0 ? ` | ${scopedParts.join(" | ")}` : "";
     if (fiveHour === null && sevenDay !== null) {
         const weeklyOnlyPart = formatUsageWindowPart({
             label: t("label.weekly"),
@@ -84,7 +100,10 @@ export function renderUsageLine(ctx, alignLabels = false) {
             alignLabels,
             usageValueMode,
         });
-        return appendBalance(`${usageLabel} ${weeklyOnlyPart}`, balanceLabel);
+        return appendBalance(`${usageLabel} ${weeklyOnlyPart}${scopedSuffix}`, balanceLabel);
+    }
+    if (fiveHour === null && scopedParts.length > 0) {
+        return appendBalance(`${usageLabel} ${scopedParts.join(" | ")}`, balanceLabel);
     }
     const fiveHourPart = formatUsageWindowPart({
         label: "5h",
@@ -114,9 +133,9 @@ export function renderUsageLine(ctx, alignLabels = false) {
             alignLabels,
             usageValueMode,
         });
-        return appendBalance(`${usageLabel} ${fiveHourPart} | ${sevenDayPart}`, balanceLabel);
+        return appendBalance(`${usageLabel} ${fiveHourPart} | ${sevenDayPart}${scopedSuffix}`, balanceLabel);
     }
-    return appendBalance(`${usageLabel} ${fiveHourPart}`, balanceLabel);
+    return appendBalance(`${usageLabel} ${fiveHourPart}${scopedSuffix}`, balanceLabel);
 }
 function appendBalance(line, balanceLabel) {
     return balanceLabel ? `${line} | ${balanceLabel}` : line;

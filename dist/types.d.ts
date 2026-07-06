@@ -42,6 +42,11 @@ export interface StdinData {
             used_percentage?: number | null;
             resets_at?: number | null;
         } | null;
+        model_scoped?: Array<{
+            display_name?: string | null;
+            utilization?: number | null;
+            resets_at?: string | number | null;
+        } | null> | null;
     } | null;
     effort?: string | {
         level?: string | null;
@@ -70,12 +75,18 @@ export interface TodoItem {
     content: string;
     status: 'pending' | 'in_progress' | 'completed';
 }
+export interface ModelScopedUsage {
+    label: string;
+    percent: number | null;
+    resetAt: Date | null;
+}
 export interface UsageData {
     fiveHour: number | null;
     sevenDay: number | null;
     fiveHourResetAt: Date | null;
     sevenDayResetAt: Date | null;
     balanceLabel?: string | null;
+    modelScoped?: ModelScopedUsage[];
 }
 export interface ExternalUsageSnapshot {
     five_hour?: {
